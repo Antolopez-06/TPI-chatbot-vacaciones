@@ -1,0 +1,17 @@
+# Forzar UTF-8 como codificación por defecto
+* text=auto eol=lf working-tree-encoding=UTF-8
+
+# Archivos Python siempre en UTF-8
+*.py text eol=lf working-tree-encoding=UTF-8
+
+# Archivos de texto y Markdown
+*.txt text eol=lf working-tree-encoding=UTF-8
+*.md  text eol=lf working-tree-encoding=UTF-8
+
+# Excel y binarios: no convertir finales de línea
+*.xlsx binary
+*.xls  binary
+
+# Configuración de VSCode y JSON
+*.json text eol=lf working-tree-encoding=UTF-8
+*.code-workspace text eol=lf working-tree-encoding=UTF
