@@ -1,0 +1,27 @@
+# Archivos de Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Entornos virtuales
+.env
+.venv/
+env/
+venv/
+ENV/
+
+# Configuración de VSCode
+.vscode/
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Excel de datos (no versionar información sensible)
+TechFlow_Vacaciones.xlsx
+
+# Archivos temporales o de prueba
+*.log
+*.tmp
+*.bak
