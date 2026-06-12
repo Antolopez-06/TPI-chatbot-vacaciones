@@ -7,7 +7,8 @@
 #  2. Ponelos en la MISMA carpeta
 #  3. En VSCode abrí esa carpeta (File > Open Folder)
 #  4. Abrí la terminal (Ctrl + J)
-#  5. Escribí: python bot_vacaciones.py
+#  5. Escribí: pip install openpyxl
+#  6. Escribí: python bot_vacaciones.py
 # ============================================================
 
 import openpyxl
@@ -101,6 +102,72 @@ def hay_conflicto_equipo(fecha_ini, fecha_fin):
             if not (fecha_fin < f_ini_sol or fecha_ini > f_fin_sol):
                 ausentes.add(fila[1])
     return len(ausentes) >= 3
+
+
+def obtener_historial_empleado(nombre):
+    """
+    Devuelve todas las solicitudes previas de un empleado (excluyendo PENDIENTE activo).
+    Retorna lista de dicts con los datos relevantes.
+    """
+    wb = openpyxl.load_workbook(EXCEL)
+    ws = wb["Solicitudes"]
+    historial = []
+    for fila in ws.iter_rows(min_row=3, values_only=True):
+        if not fila[0]:
+            continue
+        if str(fila[2]).strip().lower() == nombre.strip().lower():
+            f_ini = fila[4]
+            f_fin = fila[5]
+            if isinstance(f_ini, datetime):
+                f_ini = f_ini.date()
+            if isinstance(f_fin, datetime):
+                f_fin = f_fin.date()
+            historial.append({
+                "id_sol":  str(fila[0]),
+                "inicio":  f_ini,
+                "fin":     f_fin,
+                "dias":    fila[6],
+                "motivo":  str(fila[7]),
+                "estado":  str(fila[8]),
+            })
+    return historial
+
+
+def obtener_ausentes_en_periodo(fecha_ini, fecha_fin, excluir_nombre=None):
+    """
+    Devuelve lista de empleados con solicitudes APROBADAS que se solapan con el período.
+    Opcionalmente excluye al empleado que está haciendo la solicitud actual.
+    """
+    wb = openpyxl.load_workbook(EXCEL)
+    ws = wb["Solicitudes"]
+    ausentes = []
+    vistos = set()
+    for fila in ws.iter_rows(min_row=3, values_only=True):
+        if not fila[0]:
+            continue
+        if str(fila[8]).strip().upper() != "APROBADA":
+            continue
+        nombre_comp = str(fila[2]).strip()
+        if excluir_nombre and nombre_comp.lower() == excluir_nombre.strip().lower():
+            continue
+        if nombre_comp in vistos:
+            continue
+        f_ini_sol = fila[4]
+        f_fin_sol = fila[5]
+        if isinstance(f_ini_sol, datetime):
+            f_ini_sol = f_ini_sol.date()
+        if isinstance(f_fin_sol, datetime):
+            f_fin_sol = f_fin_sol.date()
+        if isinstance(f_ini_sol, date) and isinstance(f_fin_sol, date):
+            if not (fecha_fin < f_ini_sol or fecha_ini > f_fin_sol):
+                ausentes.append({
+                    "nombre": nombre_comp,
+                    "area":   str(fila[3]),
+                    "inicio": f_ini_sol,
+                    "fin":    f_fin_sol,
+                })
+                vistos.add(nombre_comp)
+    return ausentes
 
 
 def proximo_numero():
@@ -350,6 +417,44 @@ def iniciar_bot():
 
     # ── COMPUERTA XOR #3: ¿El responsable aprueba? ──────────
     print(f"\n  🔀 Compuerta XOR #3 — Decisión del responsable del área")
+
+    # — Historial de vacaciones del empleado —
+    sep()
+    print(f"{NEGRITA}{AZUL}  📋 HISTORIAL DE VACACIONES — {empleado['nombre'].upper()}{RESET}")
+    sep()
+    historial = obtener_historial_empleado(empleado["nombre"])
+    if not historial:
+        print("  Sin solicitudes previas registradas.")
+    else:
+        print(f"  {'N° Solicitud':<18} {'Inicio':<13} {'Fin':<13} {'Días':<6} {'Estado':<12} {'Motivo'}")
+        print(f"  {'─'*18} {'─'*12} {'─'*12} {'─'*5} {'─'*11} {'─'*20}")
+        for h in historial:
+            ini_str = h["inicio"].strftime("%d/%m/%Y") if h["inicio"] else "—"
+            fin_str = h["fin"].strftime("%d/%m/%Y") if h["fin"] else "—"
+            estado_col = (
+                f"{VERDE}{h['estado']:<12}{RESET}" if h["estado"] == "APROBADA"
+                else f"{ROJO}{h['estado']:<12}{RESET}" if h["estado"] == "RECHAZADA"
+                else f"{AMARILLO}{h['estado']:<12}{RESET}"
+            )
+            print(f"  {h['id_sol']:<18} {ini_str:<13} {fin_str:<13} {str(h['dias']):<6} {estado_col} {h['motivo'][:30]}")
+
+    # — Compañeros ausentes en el mismo período —
+    sep()
+    print(f"{NEGRITA}{AZUL}  👥 COMPAÑEROS AUSENTES EN EL MISMO PERÍODO{RESET}")
+    sep()
+    ausentes = obtener_ausentes_en_periodo(fecha_ini, fecha_fin, excluir_nombre=empleado["nombre"])
+    if not ausentes:
+        print("  Ningún compañero con vacaciones aprobadas en ese período.")
+    else:
+        print(f"  {'Nombre':<22} {'Área':<16} {'Inicio':<13} {'Fin'}")
+        print(f"  {'─'*21} {'─'*15} {'─'*12} {'─'*12}")
+        for a in ausentes:
+            ini_str = a["inicio"].strftime("%d/%m/%Y")
+            fin_str = a["fin"].strftime("%d/%m/%Y")
+            print(f"  {a['nombre']:<22} {a['area']:<16} {ini_str:<13} {fin_str}")
+        print(f"\n  Total ausentes: {NEGRITA}{len(ausentes)}{RESET}")
+    sep()
+
     bot(f"¿El responsable ({empleado['responsable']}) aprueba? (SI / NO)")
     decision = pedir().upper()
 
